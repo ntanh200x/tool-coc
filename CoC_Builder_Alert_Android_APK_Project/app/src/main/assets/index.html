@@ -1,0 +1,2205 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>CoC Builder Alert — Hẹn Giờ Thợ Xây, Lab &amp; Linh Thú</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%);
+      min-height: 100vh;
+      color: #f8fafc;
+    }
+    @keyframes pulse-border {
+      0%, 100% { border-color: rgba(245, 158, 11, 0.9); box-shadow: 0 0 20px rgba(245, 158, 11, 0.35); }
+      50% { border-color: rgba(239, 68, 68, 0.95); box-shadow: 0 0 28px rgba(239, 68, 68, 0.55); }
+    }
+    .alert-card-pulse {
+      animation: pulse-border 1.4s infinite ease-in-out;
+    }
+    @keyframes potion-glow {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6)); }
+      50% { transform: scale(1.06); filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.85)); }
+    }
+    .potion-active-glow {
+      animation: potion-glow 1.6s infinite ease-in-out;
+    }
+    .widget-glass {
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.92) 100%);
+      backdrop-filter: blur(16px);
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-amber-500 selection:text-slate-950 pb-12">
+
+  <!-- Canvas & Video ẩn phục vụ tính năng Ghim Widget Nổi (Picture-in-Picture) trên điện thoại Android -->
+  <canvas id="pipWidgetCanvas" width="460" height="260" class="hidden"></canvas>
+  <video id="pipWidgetVideo" muted playsinline class="hidden"></video>
+
+  <!-- Banner Cảnh Báo Nổi Khi Còn 3-5 Phút Hoặc Khi Chạm 0s -->
+  <div id="urgentBanner" class="hidden sticky top-0 z-50 bg-gradient-to-r from-amber-500 via-orange-500 to-red-600 text-slate-950 shadow-2xl border-b border-amber-300">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl animate-bounce" id="urgentBannerIcon">🔔</span>
+        <div>
+          <p class="font-extrabold text-sm sm:text-base uppercase tracking-wide" id="urgentBannerTitle">
+            Tiến trình sắp hoàn thành!
+          </p>
+          <p class="text-xs sm:text-sm font-semibold text-slate-900" id="urgentBannerDesc">
+            Vào game ngay để bấm hoàn thành miễn phí (&lt; 5 phút) hoặc giao việc mới!
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+        <a id="btnLaunchGameBanner" href="clashofclans://" class="px-3.5 py-1.5 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-400/40 font-extrabold text-xs sm:text-sm hover:bg-emerald-900 transition shadow flex items-center gap-1.5">
+          <span>🚀</span>
+          <span>Mở thẳng vào Game</span>
+        </a>
+        <button id="btnStopAlarmSound" type="button" class="px-4 py-1.5 rounded-lg bg-slate-950 text-amber-400 font-bold text-xs sm:text-sm hover:bg-slate-900 transition shadow">
+          Tắt chuông báo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Thông Báo Nhanh -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-xs w-full pointer-events-none"></div>
+
+  <div class="max-w-3xl mx-auto px-4 pt-4 space-y-4">
+
+    <!-- =================================================================== -->
+    <!-- WIDGET ĐIỆN THOẠI (ANDROID HOME / FLOATING PIP WIDGET)              -->
+    <!-- =================================================================== -->
+    <section id="mobileWidgetSection" class="widget-glass border-2 border-slate-700/80 rounded-3xl p-4 shadow-2xl relative overflow-hidden">
+      <div class="flex items-center justify-between gap-2 pb-3 border-b border-slate-800/90">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+          <span class="text-xs font-extrabold uppercase tracking-wider text-amber-400">
+            📱 Widget Điện Thoại • CoC Live
+          </span>
+          <span id="widgetClockNow" class="text-[11px] font-mono text-slate-400">00:00:00</span>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <button id="btnFloatingPipWidget" type="button" title="Tạo cửa sổ Widget nhỏ nổi đè lên màn hình điện thoại (Picture-in-Picture)" class="px-2.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-[11px] transition shadow flex items-center gap-1">
+            <span>🖼️</span>
+            <span>Ghim Widget Nổi</span>
+          </button>
+          <button id="btnToggleWidgetMode" type="button" title="Thu gọn toàn trang chỉ giữ lại Widget cho màn hình điện thoại" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-[11px] transition">
+            Chế độ Widget
+          </button>
+          <a href="clashofclans://" title="Mở thẳng Clash of Clans" class="w-7 h-7 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 flex items-center justify-center text-xs">
+            🚀
+          </a>
+        </div>
+      </div>
+
+      <!-- Nội dung tóm tắt siêu gọn trong Widget (3 cột: Thợ xây | Lab | Linh thú + Danh sách rút gọn) -->
+      <div id="widgetCompactBody" class="pt-3 space-y-2.5"></div>
+    </section>
+
+    <!-- Phần điều khiển đầy đủ (có thể ẩn đi khi bật Chế độ Chỉ Hiện Widget) -->
+    <div id="fullDashboardWrapper" class="space-y-5">
+
+      <!-- Header -->
+      <header class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-start gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-2xl shadow-lg shrink-0">
+              ⚒️
+            </div>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h1 class="text-lg sm:text-xl font-extrabold text-white tracking-tight">
+                  Hẹn Giờ Thợ Xây • Lab • Linh Thú
+                </h1>
+                <span class="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Auto-Sync
+                </span>
+              </div>
+              <p class="text-xs sm:text-sm text-slate-400 mt-0.5">
+                Báo trước 3–5 phút &amp; khi còn <b>0s</b>, tùy chỉnh số phút còn lại của từng bình thuốc và hỗ trợ Widget nổi trên điện thoại.
+              </p>
+            </div>
+          </div>
+
+          <!-- Cụm nút Mở Game, Bật/Tắt Âm báo, Chỉ bật rung & Thông báo -->
+          <div class="flex flex-wrap items-center gap-2">
+            <a id="btnOpenCocApp" href="clashofclans://" class="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold transition flex items-center justify-center gap-1.5 shadow">
+              <span>🚀</span>
+              <span>Mở Game CoC</span>
+            </a>
+
+            <!-- Nút Bật / Tắt Âm Báo -->
+            <button id="btnToggleSound" type="button" class="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition flex items-center justify-center gap-1.5">
+              <span id="iconSoundToggle">🔊</span>
+              <span id="lblSoundToggle">Âm báo: Bật</span>
+            </button>
+
+            <!-- Nút Chỉ Bật Rung -->
+            <button id="btnToggleVibrateOnly" type="button" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5">
+              <span>📳</span>
+              <span id="lblVibrateOnly">Chỉ rung: Tắt</span>
+            </button>
+
+            <button id="btnTestSound" type="button" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-semibold transition flex items-center justify-center gap-1.5">
+              <span>🔊</span>
+              <span>Thử chuông</span>
+            </button>
+
+            <button id="btnEnableNotif" type="button" class="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow">
+              <span>📲</span>
+              <span id="notifStatusText">Bật thông báo</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Khung Đồng Bộ 1 Chạm & Kệ Icon Bình Tăng Tốc (Icon-only Potions) -->
+        <div class="mt-4 p-3.5 rounded-xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <button id="btnOneTapSync" type="button" class="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg transition flex items-center justify-center gap-1.5">
+              <span>🔄</span>
+              <span>Đồng Bộ 1 Chạm Từ Game</span>
+            </button>
+            <span class="text-[11px] text-slate-400" id="autoSyncStatusLabel">
+              Bấm vào icon bình thuốc để chỉnh chính xác số phút/giây thuốc còn lại
+            </span>
+          </div>
+
+          <!-- Kệ Bình Tăng Tốc Dạng Icon Gọn Đẹp (Icon-Only) -->
+          <div class="flex items-center gap-2 self-end sm:self-center">
+            <span class="text-[11px] font-semibold text-slate-400 mr-0.5">Bình thuốc:</span>
+
+            <!-- Icon 1: Bình Thuốc Thợ Xây (10x) -->
+            <button id="btnLivePotion10x" type="button" title="Bình Thuốc Thợ Xây (10x) — Bấm để chỉnh số phút thuốc còn lại hoặc bật 1h" class="relative w-11 h-11 rounded-xl bg-sky-500/15 hover:bg-sky-500/30 border border-sky-400/40 flex flex-col items-center justify-center transition shadow">
+              <span class="text-lg leading-none">⚒️🧪</span>
+              <span id="badgeBuilderPotion" class="text-[9px] font-extrabold text-sky-300 mt-0.5 font-mono">10x</span>
+            </button>
+
+            <!-- Icon 2: Bình Tăng Tốc Nghiên Cứu Lab (24x) -->
+            <button id="btnLabPotionIcon" type="button" title="Bình Nghiên Cứu Phòng Lab (24x) — Bấm để chỉnh số phút thuốc còn lại hoặc bật 1h" class="relative w-11 h-11 rounded-xl bg-purple-500/15 hover:bg-purple-500/30 border border-purple-400/40 flex flex-col items-center justify-center transition shadow">
+              <span class="text-lg leading-none">🔬🧪</span>
+              <span id="badgeLabPotion" class="text-[9px] font-extrabold text-purple-300 mt-0.5 font-mono">24x</span>
+            </button>
+
+            <!-- Icon 3: Bình Tăng Tốc Nâng Cấp Linh Thú (24x) -->
+            <button id="btnPetPotionIcon" type="button" title="Bình Linh Thú Pet (24x) — Bấm để chỉnh số phút thuốc còn lại hoặc bật 1h" class="relative w-11 h-11 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-400/40 flex flex-col items-center justify-center transition shadow">
+              <span class="text-lg leading-none">🐾🧪</span>
+              <span id="badgePetPotion" class="text-[9px] font-extrabold text-emerald-300 mt-0.5 font-mono">24x</span>
+            </button>
+
+            <!-- Icon Mở nhanh khung chỉnh giờ thuốc tùy ý -->
+            <button id="btnOpenPotionCustomEditor" type="button" title="Chỉnh số phút/giây còn lại của bình thuốc đang chạy dở" class="w-9 h-11 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 flex items-center justify-center text-sm font-bold transition">
+              ⏱️
+            </button>
+
+            <!-- Icon Xóa/Reset hiệu ứng thuốc đang chạy -->
+            <button id="btnStopPotionBoost" type="button" title="Tắt toàn bộ hiệu ứng bình tăng tốc đang đếm" class="hidden w-9 h-11 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 flex items-center justify-center text-sm font-bold transition">
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <!-- Khung Chỉnh Thời Gian Bình Thuốc Đang Chạy Dở (Mở khi bấm vào icon thuốc hoặc nút ⏱️) -->
+        <div id="potionEditorPanel" class="hidden mt-3 p-3.5 rounded-xl bg-slate-950 border border-amber-500/40 space-y-3">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-2">
+              <span id="potionEditorTitleIcon" class="text-lg">⚒️🧪</span>
+              <span id="potionEditorTitleText" class="text-xs sm:text-sm font-extrabold text-amber-300">
+                Chỉnh thời gian còn lại: Thuốc Thợ Xây (10x)
+              </span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button type="button" data-potion-tab="builder" class="potion-tab-btn px-2 py-1 rounded-lg text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40">⚒️🧪</button>
+              <button type="button" data-potion-tab="lab" class="potion-tab-btn px-2 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">🔬🧪</button>
+              <button type="button" data-potion-tab="pet" class="potion-tab-btn px-2 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">🐾🧪</button>
+              <button id="btnClosePotionEditor" type="button" class="ml-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold">Đóng</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 items-end">
+            <div>
+              <label for="inpPotionHours" class="block text-[10px] text-slate-400 mb-1">Giờ thuốc còn</label>
+              <input id="inpPotionHours" type="number" min="0" max="24" value="0" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-1.5 text-center font-bold text-sm text-white focus:border-amber-400 focus:outline-none" />
+            </div>
+            <div>
+              <label for="inpPotionMinutes" class="block text-[10px] text-slate-400 mb-1">Phút thuốc còn</label>
+              <input id="inpPotionMinutes" type="number" min="0" max="59" value="42" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-1.5 text-center font-bold text-sm text-white focus:border-amber-400 focus:outline-none" />
+            </div>
+            <div>
+              <label for="inpPotionSeconds" class="block text-[10px] text-slate-400 mb-1">Giây thuốc còn</label>
+              <input id="inpPotionSeconds" type="number" min="0" max="59" value="0" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-1.5 text-center font-bold text-sm text-white focus:border-amber-400 focus:outline-none" />
+            </div>
+            <div class="col-span-3 flex items-center gap-1.5">
+              <button id="btnApplyCustomPotionTime" type="button" class="flex-1 py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition shadow">
+                ✓ Đặt đúng giờ thuốc còn
+              </button>
+              <button id="btnAddOneHourPotion" type="button" class="py-2 px-2.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-400/40 font-bold text-xs transition">
+                +60p
+              </button>
+              <button id="btnClearSinglePotion" type="button" class="py-2 px-2.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 font-bold text-xs transition">
+                0p
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
+            <span class="text-slate-400">Chọn nhanh phút còn lại:</span>
+            <button type="button" data-pmin="15" class="potion-preset-chip px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">15p</button>
+            <button type="button" data-pmin="30" class="potion-preset-chip px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">30p</button>
+            <button type="button" data-pmin="40" class="potion-preset-chip px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">40p</button>
+            <button type="button" data-pmin="45" class="potion-preset-chip px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">45p</button>
+            <button type="button" data-pmin="50" class="potion-preset-chip px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">50p</button>
+            <button type="button" data-pmin="60" class="potion-preset-chip px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">60p (Mới bật)</button>
+          </div>
+        </div>
+
+        <!-- Thanh hiển thị tiến độ thuốc siêu gọn (ẩn khi không bật thuốc) -->
+        <div id="potionActiveBanner" class="hidden mt-2.5 px-3 py-2 rounded-xl bg-slate-950/90 border border-sky-500/30 flex items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-3 flex-wrap" id="potionRemainingClock"></div>
+          <span class="text-[11px] text-slate-400">Bấm vào icon thuốc để sửa số phút còn lại</span>
+        </div>
+
+        <!-- Thanh cấu hình số phút báo trước (Bổ sung mốc 0s & Báo cả khi 0s) -->
+        <div class="mt-4 pt-3.5 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-semibold text-slate-300">⏰ Báo trước khi xong:</span>
+            <div class="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800 flex-wrap" id="leadTimeGroup">
+              <button type="button" data-lead="0" class="lead-btn px-2.5 py-1 rounded-lg text-xs font-bold transition">0s (Khi xong)</button>
+              <button type="button" data-lead="3" class="lead-btn px-2.5 py-1 rounded-lg text-xs font-bold transition">3 phút</button>
+              <button type="button" data-lead="4" class="lead-btn px-2.5 py-1 rounded-lg text-xs font-bold transition">4 phút</button>
+              <button type="button" data-lead="5" class="lead-btn px-2.5 py-1 rounded-lg text-xs font-bold transition">5 phút</button>
+              <button type="button" data-lead="10" class="lead-btn px-2.5 py-1 rounded-lg text-xs font-bold transition">10 phút</button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between sm:justify-end gap-3 flex-wrap">
+            <label class="inline-flex items-center gap-1.5 cursor-pointer select-none text-xs text-amber-300 font-semibold" title="Luôn báo thêm 1 lần nữa ngay khi đồng hồ chạm 00:00:00">
+              <input type="checkbox" id="chkAlertAtZero" checked class="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500" />
+              <span>Báo cả khi còn 0s</span>
+            </label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer select-none text-xs text-emerald-300 font-semibold">
+              <input type="checkbox" id="chkAutoClipboard" checked class="rounded border-slate-700 bg-slate-800 text-emerald-500 focus:ring-emerald-500" />
+              <span>Tự quét Clipboard</span>
+            </label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer select-none text-xs text-slate-300">
+              <input type="checkbox" id="chkContinuousAlarm" checked class="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500" />
+              <span>Lặp chuông/rung</span>
+            </label>
+            <button id="btnWakeLock" type="button" class="px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-[11px] font-semibold text-slate-300 transition">
+              🌙 Giữ sáng màn hình: Tắt
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Thống kê nhanh 3 ô -->
+      <section class="grid grid-cols-3 gap-3">
+        <div class="bg-slate-900/85 border border-slate-800 rounded-2xl p-3.5">
+          <p class="text-[11px] font-medium text-slate-400">Đang theo dõi</p>
+          <p class="text-xl sm:text-2xl font-extrabold text-white mt-0.5" id="statActiveCount">0</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">tổng tiến trình</p>
+        </div>
+        <div class="bg-slate-900/85 border border-slate-800 rounded-2xl p-3.5">
+          <p class="text-[11px] font-medium text-slate-400">Sắp xong (≤ mốc báo)</p>
+          <p class="text-xl sm:text-2xl font-extrabold text-amber-400 mt-0.5" id="statAlmostDoneCount">0</p>
+          <p class="text-[11px] text-amber-300/80 mt-0.5">cần vào game ngay</p>
+        </div>
+        <div class="bg-slate-900/85 border border-slate-800 rounded-2xl p-3.5">
+          <p class="text-[11px] font-medium text-slate-400">Xong gần nhất (Chuẩn)</p>
+          <p class="text-sm sm:text-base font-extrabold text-emerald-400 mt-1 truncate" id="statNextBuilder">--:--:--</p>
+          <p class="text-[11px] text-slate-400 mt-0.5 truncate" id="statNextBuilderName">Chưa có lịch</p>
+        </div>
+      </section>
+
+      <!-- Danh sách tiến trình chia làm 3 mục riêng biệt: Thợ xây | Phòng Lab | Linh thú -->
+      <section class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-sm sm:text-base font-extrabold text-white">
+              📋 Tiến Trình Theo Khu Vực
+            </h2>
+            <span id="lastSyncBadge" class="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-400">
+              Chưa đồng bộ JSON
+            </span>
+          </div>
+
+          <!-- Nút trừ nhanh 1 bình thuốc dạng icon & nút dọn mục xong -->
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-[11px] text-slate-400 mr-0.5">Trừ nhanh 1 bình:</span>
+            <button id="btnBoostPotion" type="button" title="Trừ thẳng 54 phút cho tất cả Thợ Xây (1 bình Builder Potion)" class="w-9 h-8 rounded-lg bg-sky-500/15 hover:bg-sky-500/30 border border-sky-500/30 text-xs flex items-center justify-center transition">
+              ⚒️⚡
+            </button>
+            <button id="btnInstantLabPotion" type="button" title="Trừ thẳng 23 giờ cho Phòng Lab (1 bình Research Potion)" class="w-9 h-8 rounded-lg bg-purple-500/15 hover:bg-purple-500/30 border border-purple-500/30 text-xs flex items-center justify-center transition">
+              🔬⚡
+            </button>
+            <button id="btnInstantPetPotion" type="button" title="Trừ thẳng 23 giờ cho Nhà Linh Thú (1 bình Pet Potion)" class="w-9 h-8 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/30 text-xs flex items-center justify-center transition">
+              🐾⚡
+            </button>
+            <button id="btnClearFinished" type="button" class="ml-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition">
+              Dọn mục đã xong
+            </button>
+          </div>
+        </div>
+
+        <!-- Container chính chứa 3 phân khu riêng biệt: Thợ xây, Phòng Lab, Linh thú -->
+        <div id="builderListContainer" class="space-y-5"></div>
+      </section>
+
+      <!-- Khung Thêm Tiến Trình (2 Tab: Dán JSON từ Game & Nhập nhanh) -->
+      <section class="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div class="grid grid-cols-2 border-b border-slate-800 bg-slate-950/60">
+          <button id="tabBtnJson" type="button" class="py-3 px-4 text-xs sm:text-sm font-bold text-amber-400 border-b-2 border-amber-400 bg-slate-900/60 transition">
+            📋 2. Dán JSON Xuất Từ Game
+          </button>
+          <button id="tabBtnManual" type="button" class="py-3 px-4 text-xs sm:text-sm font-bold text-slate-400 hover:text-slate-200 transition">
+            ⏱️ 1. Nhập Giờ Thợ Xây Nhanh
+          </button>
+        </div>
+
+        <!-- TAB JSON -->
+        <div id="panelJson" class="p-4 sm:p-5 space-y-3">
+          <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-xs text-slate-300 space-y-1">
+            <p class="font-bold text-amber-300">💡 Tự động phân loại Thợ Xây • Phòng Lab • Linh Thú &amp; Nhận diện cả 3 loại Thuốc:</p>
+            <p>Dán chuỗi JSON từ <b>Cài đặt &rarr; Cài đặt thêm &rarr; Sao chép (Data Export)</b>: Công cụ tự tách riêng 3 mục và tự kích hoạt icon thuốc tương ứng với đúng số phút còn lại trong game.</p>
+          </div>
+
+          <textarea id="txtCocJson" rows="4" placeholder='Dán chuỗi JSON vừa Copy từ trong game vào đây (hoặc bấm nút "Đồng Bộ 1 Chạm Từ Game")...' class="w-full rounded-xl bg-slate-950 border border-slate-700 p-3 text-xs font-mono text-slate-200 focus:border-amber-400 focus:outline-none"></textarea>
+
+          <div class="flex flex-col sm:flex-row gap-2.5">
+            <button id="btnParseJson" type="button" class="flex-1 py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm transition shadow">
+              📥 Quét &amp; Đặt Lịch Toàn Bộ Thợ Xây
+            </button>
+            <button id="btnLoadSampleJson" type="button" class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs sm:text-sm transition">
+              📄 Nạp thử JSON mẫu của Làng TH13
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB NHẬP THỦ CÔNG -->
+        <div id="panelManual" class="hidden p-4 sm:p-5 space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+            <div class="sm:col-span-4">
+              <label for="selBuilderSlot" class="block text-xs font-semibold text-slate-300 mb-1">Chọn Khu vực / Hạng mục</label>
+              <select id="selBuilderSlot" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none">
+                <option value="Thợ xây #1">🔨 Thợ xây #1</option>
+                <option value="Thợ xây #2">🔨 Thợ xây #2</option>
+                <option value="Thợ xây #3">🔨 Thợ xây #3</option>
+                <option value="Thợ xây #4">🔨 Thợ xây #4</option>
+                <option value="Thợ xây #5">🔨 Thợ xây #5</option>
+                <option value="Thợ xây #6 (B.O.B)">🤖 Thợ xây #6 (B.O.B)</option>
+                <option value="Thợ Goblin">👺 Thợ phụ Goblin</option>
+                <option value="Phòng Lab">🔬 Phòng thí nghiệm (Lab)</option>
+                <option value="Nhà Thú (Pet)">🐾 Nhà Linh Thú (Pet House)</option>
+              </select>
+            </div>
+
+            <div class="sm:col-span-8">
+              <label for="inpUpgradeName" class="block text-xs font-semibold text-slate-300 mb-1">Tên công trình / Lính / Linh thú</label>
+              <input id="inpUpgradeName" type="text" placeholder="VD: Archer Queen, Electro Dragon, Kỳ Lân (Unicorn)..." value="Tháp Inferno (Lên cấp 8)" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none" />
+            </div>
+          </div>
+
+          <!-- Gợi ý chọn nhanh -->
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-[11px] text-slate-400 mr-1">Chọn nhanh:</span>
+            <button type="button" data-quickname="Archer Queen" data-slot="Thợ xây #1" class="quick-name-chip px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700 transition">👑 Archer Queen</button>
+            <button type="button" data-quickname="Barbarian King" data-slot="Thợ xây #1" class="quick-name-chip px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700 transition">⚔️ Barbarian King</button>
+            <button type="button" data-quickname="Grand Warden" data-slot="Thợ xây #2" class="quick-name-chip px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700 transition">📖 Grand Warden</button>
+            <button type="button" data-quickname="Royal Champion" data-slot="Thợ xây #3" class="quick-name-chip px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700 transition">🛡️ Royal Champion</button>
+            <button type="button" data-quickname="X-Bow" data-slot="Thợ xây #4" class="quick-name-chip px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700 transition">🏹 X-Bow</button>
+            <button type="button" data-quickname="Tháp Inferno" data-slot="Thợ xây #2" class="quick-name-chip px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700 transition">🔥 Tháp Inferno</button>
+            <button type="button" data-quickname="Pháo Đại Bàng" data-slot="Thợ xây #3" class="quick-name-chip px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700 transition">🦅 Pháo Đại Bàng</button>
+            <button type="button" data-quickname="Electro Dragon" data-slot="Phòng Lab" class="quick-name-chip px-2.5 py-1 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 text-xs text-purple-200 border border-purple-500/30 transition">🔬 Electro Dragon (Lab)</button>
+            <button type="button" data-quickname="Kỳ Lân (Unicorn)" data-slot="Nhà Thú (Pet)" class="quick-name-chip px-2.5 py-1 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 text-xs text-emerald-200 border border-emerald-500/30 transition">🐾 Kỳ Lân Unicorn (Pet)</button>
+            <button type="button" data-quickname="Phượng Hoàng (Phoenix)" data-slot="Nhà Thú (Pet)" class="quick-name-chip px-2.5 py-1 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 text-xs text-emerald-200 border border-emerald-500/30 transition">🐾 Phượng Hoàng (Pet)</button>
+          </div>
+
+          <!-- Nhập Ngày / Giờ / Phút / Giây còn lại -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Thời gian còn lại hiển thị trong game</label>
+            <div class="grid grid-cols-4 gap-2.5">
+              <div>
+                <input id="inpDays" type="number" min="0" max="30" value="0" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-center font-bold text-base text-white focus:border-amber-400 focus:outline-none" />
+                <p class="text-[11px] text-center text-slate-400 mt-1">Ngày (d)</p>
+              </div>
+              <div>
+                <input id="inpHours" type="number" min="0" max="23" value="1" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-center font-bold text-base text-white focus:border-amber-400 focus:outline-none" />
+                <p class="text-[11px] text-center text-slate-400 mt-1">Giờ (h)</p>
+              </div>
+              <div>
+                <input id="inpMinutes" type="number" min="0" max="59" value="30" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-center font-bold text-base text-white focus:border-amber-400 focus:outline-none" />
+                <p class="text-[11px] text-center text-slate-400 mt-1">Phút (m)</p>
+              </div>
+              <div>
+                <input id="inpSeconds" type="number" min="0" max="59" value="0" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-center font-bold text-base text-white focus:border-amber-400 focus:outline-none" />
+                <p class="text-[11px] text-center text-slate-400 mt-1">Giây (s)</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nút Thêm & Nút Test 8 Giây -->
+          <div class="flex flex-col sm:flex-row gap-2.5 pt-1">
+            <button id="btnAddManual" type="button" class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold text-sm shadow-lg transition">
+              + Đặt Hẹn Giờ Cho Thợ Xây Này
+            </button>
+            <button id="btnAddQuickDemo" type="button" class="py-2.5 px-4 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-bold text-xs sm:text-sm transition">
+              ⚡ Tạo mẫu thử kêu sau 8 giây
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. TỪ ĐIỂN ÁNH XẠ ID CÔNG TRÌNH, HERO, LÍNH & LINH THÚ CLASH OF CLANS
+    // =========================================================================
+    const COC_DATA_NAMES = {
+      1000001: "Nhà Chính (Town Hall)",
+      1000000: "Trại Lính (Army Camp)",
+      1000002: "Mỏ Elixir",
+      1000003: "Kho Elixir",
+      1000004: "Mỏ Vàng",
+      1000005: "Kho Vàng",
+      1000006: "Nhà Lính (Barracks)",
+      1000007: "Phòng Thí Nghiệm (Lab)",
+      1000008: "Pháo (Cannon)",
+      1000009: "Tháp Cung (Archer Tower)",
+      1000010: "Tường",
+      1000011: "Tháp Phù Thủy (Wizard Tower)",
+      1000012: "Pháo Phòng Không (Air Defense)",
+      1000013: "Súng Cối (Mortar)",
+      1000014: "Lâu Đài Bang Hội (Clan Castle)",
+      1000015: "Nhà Thợ Xây",
+      1000019: "Tháp Tesla Ẩn",
+      1000020: "Xưởng Phép (Spell Factory)",
+      1000021: "Cung X (X-Bow)",
+      1000023: "Mỏ Dầu Đen (Dark Elixir Drill)",
+      1000024: "Kho Dầu Đen",
+      1000026: "Nhà Lính Hắc Ám (Dark Barracks)",
+      1000027: "Tháp Địa Ngục (Inferno Tower)",
+      1000028: "Thổi Gió (Air Sweeper)",
+      1000031: "Pháo Đại Bàng (Eagle Artillery)",
+      1000032: "Tháp Bom (Bomb Tower)",
+      1000059: "Xưởng Máy Công Thành",
+      1000067: "Máy Ném Đá (Scattershot)",
+      1000068: "Nhà Linh Thú (Pet House)",
+      1000070: "Lò Rèn (Blacksmith)",
+      1000077: "Tháp Đa Năng (Monolith)",
+      1000079: "Tháp Phép Thuật (Spell Tower)",
+      1000084: "Pháo Liên Hoàn (Ricochet Cannon)",
+      1000085: "Tháp Đa Cung (Multi-Archer Tower)",
+      28000000: "Barbarian King",
+      28000001: "Archer Queen",
+      28000002: "Grand Warden",
+      28000004: "Royal Champion",
+      28000006: "Minion Prince",
+      4000000: "Barbarian",
+      4000001: "Archer",
+      4000002: "Goblin / Sneaky Goblin",
+      4000005: "Balloon",
+      4000008: "Dragon",
+      4000059: "Electro Dragon",
+      26000000: "Rage Spell",
+      26000002: "Jump Spell",
+      73000000: "L.A.S.S.I (Linh thú)",
+      73000001: "Cú Điện Electro Owl (Linh thú)",
+      73000002: "Bò Mighty Yak (Linh thú)",
+      73000003: "Kỳ Lân Unicorn (Linh thú)",
+      73000004: "Frosty (Linh thú)",
+      73000007: "Đào Đất Diggy (Linh thú)",
+      73000008: "Thằn Lằn Độc Poison Lizard",
+      73000009: "Phượng Hoàng Phoenix (Linh thú)",
+      73000010: "Cáo Tâm Linh Spirit Fox"
+    };
+
+    // =========================================================================
+    // 2. QUẢN LÝ TRẠNG THÁI (BÁO TRƯỚC 0S + CHỈNH GIỜ THUỐC + WIDGET)
+    // =========================================================================
+    const STORAGE_KEY = "coc_builder_notifier_state_v4";
+
+    let appState = {
+      leadMinutes: 5,
+      alertAtZero: true,
+      continuousAlarm: true,
+      autoClipboard: true,
+      soundEnabled: true,
+      vibrateOnly: false,
+      widgetOnlyMode: false,
+      // Thời điểm kết thúc hiệu lực 3 loại thuốc (ms thực tế)
+      builderPotionEndMs: 0, // 10x tốc độ
+      labPotionEndMs: 0,     // 24x tốc độ
+      petPotionEndMs: 0,     // 24x tốc độ
+      lastJsonTimestamp: 0,
+      lastClipboardHash: "",
+      lastSyncTimeStr: "",
+      tasks: []
+    };
+
+    let selectedPotionForEdit = "builder"; // 'builder' | 'lab' | 'pet'
+    let audioCtx = null;
+    let alarmIntervalId = null;
+    let isAlarmRinging = false;
+    let wakeLockSentinel = null;
+    let lastTickMs = Date.now();
+
+    
+    // --- Cầu nối Native Android APK (Tự động đặt Alarm ngầm & cập nhật Widget màn hình chính) ---
+    function syncWithAndroidNativeBridge() {
+      try {
+        if (window.AndroidNative && typeof window.AndroidNative.syncTasksJson === "function") {
+          const now = Date.now();
+          const payload = appState.tasks.map((t) => ({
+            id: String(t.id),
+            builder: t.builder,
+            name: t.name,
+            category: getTaskCategory(t),
+            realRemainingMs: computeRealRemainingMs(t, now),
+            leadMinutes: appState.leadMinutes,
+            alertAtZero: appState.alertAtZero,
+            vibrateOnly: appState.vibrateOnly,
+            soundEnabled: appState.soundEnabled
+          }));
+          window.AndroidNative.syncTasksJson(JSON.stringify(payload));
+        }
+      } catch (e) {}
+    }
+
+    function saveState() {
+      syncWithAndroidNativeBridge();
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      } catch (err) {
+        // Bỏ qua nếu trình duyệt chặn localStorage
+      }
+    }
+
+    function getTaskCategory(task) {
+      if (task.category) return task.category;
+      const b = String(task.builder || "").toLowerCase();
+      if (b.includes("lab") || b.includes("thí nghiệm")) return "lab";
+      if (b.includes("thú") || b.includes("pet")) return "pet";
+      return "builder";
+    }
+
+    function getBoostInfoForTask(task, nowMs) {
+      const cat = getTaskCategory(task);
+      if (cat === "lab") {
+        return {
+          multiplier: 24,
+          boostRemMs: Math.max(0, (appState.labPotionEndMs || 0) - nowMs),
+          icon: "🔬🧪"
+        };
+      }
+      if (cat === "pet") {
+        return {
+          multiplier: 24,
+          boostRemMs: Math.max(0, (appState.petPotionEndMs || 0) - nowMs),
+          icon: "🐾🧪"
+        };
+      }
+      return {
+        multiplier: 10,
+        boostRemMs: Math.max(0, (appState.builderPotionEndMs || 0) - nowMs),
+        icon: "⚒️🧪"
+      };
+    }
+
+    function computeRealRemainingMs(task, nowMs) {
+      const gameRemMs = Math.max(0, task.gameRemainingMs);
+      if (gameRemMs <= 0) return 0;
+
+      const { multiplier, boostRemMs } = getBoostInfoForTask(task, nowMs);
+      if (boostRemMs <= 0) return gameRemMs;
+
+      const workDoneDuringBoostMs = boostRemMs * multiplier;
+      if (gameRemMs <= workDoneDuringBoostMs) {
+        return Math.ceil(gameRemMs / multiplier);
+      }
+      return gameRemMs - boostRemMs * (multiplier - 1);
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.tasks)) {
+            appState = { ...appState, ...parsed };
+            return;
+          }
+        }
+      } catch (err) {
+        // Dùng dữ liệu mẫu mặc định bên dưới
+      }
+
+      const now = Date.now();
+      appState.tasks = [
+        {
+          id: "demo-1",
+          itemKey: "heroes_28000001",
+          category: "builder",
+          builder: "Thợ xây #1",
+          name: "Archer Queen (Lên cấp 75)",
+          initialGameMs: 3600 * 1000,
+          gameRemainingMs: (6 * 60 + 15) * 1000,
+          notifiedLead: false,
+          notifiedDone: false
+        },
+        {
+          id: "demo-2",
+          itemKey: "buildings_1000027_0",
+          category: "builder",
+          builder: "Thợ xây #2",
+          name: "Tháp Địa Ngục (Lên cấp 8)",
+          initialGameMs: 4 * 3600 * 1000,
+          gameRemainingMs: (2 * 3600 + 18 * 60) * 1000,
+          notifiedLead: false,
+          notifiedDone: false
+        },
+        {
+          id: "demo-3",
+          itemKey: "units_4000002",
+          category: "lab",
+          builder: "Phòng Lab",
+          name: "Goblin / Sneaky Goblin (Lên cấp 9)",
+          initialGameMs: 8 * 3600 * 1000,
+          gameRemainingMs: (5 * 3600 + 42 * 60) * 1000,
+          notifiedLead: false,
+          notifiedDone: false
+        },
+        {
+          id: "demo-4",
+          itemKey: "pets_73000003",
+          category: "pet",
+          builder: "Nhà Thú (Pet)",
+          name: "Kỳ Lân Unicorn (Lên cấp 8)",
+          initialGameMs: 12 * 3600 * 1000,
+          gameRemainingMs: (9 * 3600 + 20 * 60) * 1000,
+          notifiedLead: false,
+          notifiedDone: false
+        }
+      ];
+      lastTickMs = now;
+    }
+
+    // =========================================================================
+    // 3. HỆ THỐNG CHUÔNG BÁO & CHẾ ĐỘ CHỈ BẬT RUNG (VIBRATE ONLY)
+    // =========================================================================
+    function ensureAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+    }
+
+    function triggerVibrationPulse() {
+      try {
+        if (navigator.vibrate) {
+          navigator.vibrate([380, 140, 380, 140, 500]);
+        }
+      } catch (e) {}
+    }
+
+    function playChimeOrVibrate() {
+      triggerVibrationPulse();
+      if (appState.vibrateOnly || !appState.soundEnabled) {
+        return;
+      }
+
+      try {
+        ensureAudioContext();
+        if (!audioCtx) return;
+
+        const now = audioCtx.currentTime;
+        const notes = [587.33, 783.99, 880.0, 1174.66];
+        notes.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, now + idx * 0.14);
+
+          gain.gain.setValueAtTime(0.001, now + idx * 0.14);
+          gain.gain.exponentialRampToValueAtTime(0.28, now + idx * 0.14 + 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.14 + 0.25);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + idx * 0.14);
+          osc.stop(now + idx * 0.14 + 0.26);
+        });
+      } catch (e) {}
+    }
+
+    function updateSoundVibrateUI() {
+      const btnSound = document.getElementById("btnToggleSound");
+      const iconSound = document.getElementById("iconSoundToggle");
+      const lblSound = document.getElementById("lblSoundToggle");
+      const btnVib = document.getElementById("btnToggleVibrateOnly");
+      const lblVib = document.getElementById("lblVibrateOnly");
+
+      const effectiveSound = appState.soundEnabled && !appState.vibrateOnly;
+
+      if (effectiveSound) {
+        iconSound.textContent = "🔊";
+        lblSound.textContent = "Âm báo: Bật";
+        btnSound.className =
+          "px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition flex items-center justify-center gap-1.5";
+      } else {
+        iconSound.textContent = "🔇";
+        lblSound.textContent = "Âm báo: Tắt";
+        btnSound.className =
+          "px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5";
+      }
+
+      if (appState.vibrateOnly) {
+        lblVib.textContent = "Chỉ rung: Bật";
+        btnVib.className =
+          "px-3 py-2 rounded-xl bg-purple-500/25 hover:bg-purple-500/35 text-purple-200 border border-purple-400/50 text-xs font-extrabold transition flex items-center justify-center gap-1.5 shadow";
+      } else {
+        lblVib.textContent = "Chỉ rung: Tắt";
+        btnVib.className =
+          "px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5";
+      }
+    }
+
+    function triggerUrgentAlarm(title, message) {
+      const banner = document.getElementById("urgentBanner");
+      const titleEl = document.getElementById("urgentBannerTitle");
+      const descEl = document.getElementById("urgentBannerDesc");
+      const iconEl = document.getElementById("urgentBannerIcon");
+
+      titleEl.textContent = title;
+      descEl.textContent = message;
+      iconEl.textContent = appState.vibrateOnly ? "📳" : "🔔";
+      banner.classList.remove("hidden");
+
+      playChimeOrVibrate();
+
+      if (appState.continuousAlarm && !isAlarmRinging) {
+        isAlarmRinging = true;
+        if (alarmIntervalId) clearInterval(alarmIntervalId);
+        alarmIntervalId = setInterval(() => {
+          playChimeOrVibrate();
+        }, 3200);
+      }
+
+      try {
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification(title, {
+            body: message,
+            silent: appState.vibrateOnly || !appState.soundEnabled,
+            tag: "coc-builder-alert-" + Date.now()
+          });
+        }
+      } catch (err) {}
+    }
+
+    function stopUrgentAlarm() {
+      isAlarmRinging = false;
+      if (alarmIntervalId) {
+        clearInterval(alarmIntervalId);
+        alarmIntervalId = null;
+      }
+      try {
+        if (navigator.vibrate) navigator.vibrate(0);
+      } catch (e) {}
+      document.getElementById("urgentBanner").classList.add("hidden");
+    }
+
+    function showToast(text, type = "info") {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      const bgClass =
+        type === "success"
+          ? "bg-emerald-500 text-slate-950"
+          : type === "warning"
+          ? "bg-amber-400 text-slate-950"
+          : "bg-slate-800 text-white border border-slate-700";
+
+      toast.className = `${bgClass} px-3.5 py-2.5 rounded-xl shadow-xl text-xs font-bold transition-all duration-300 pointer-events-auto`;
+      toast.textContent = text;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 300);
+      }, 3200);
+    }
+
+    // =========================================================================
+    // 4. CHỈNH THỜI GIAN BÌNH THUỐC TÙY Ý (KHI THUỐC ĐÃ CHẠY DỞ TRONG GAME)
+    // =========================================================================
+    function openPotionEditor(kind) {
+      selectedPotionForEdit = kind;
+      const panel = document.getElementById("potionEditorPanel");
+      panel.classList.remove("hidden");
+
+      const titleIcon = document.getElementById("potionEditorTitleIcon");
+      const titleText = document.getElementById("potionEditorTitleText");
+      const now = Date.now();
+
+      let remMs = 0;
+      if (kind === "builder") {
+        titleIcon.textContent = "⚒️🧪";
+        titleText.textContent = "Chỉnh thời gian còn lại: Thuốc Thợ Xây (10x)";
+        remMs = Math.max(0, (appState.builderPotionEndMs || 0) - now);
+      } else if (kind === "lab") {
+        titleIcon.textContent = "🔬🧪";
+        titleText.textContent = "Chỉnh thời gian còn lại: Thuốc Nghiên Cứu Lab (24x)";
+        remMs = Math.max(0, (appState.labPotionEndMs || 0) - now);
+      } else {
+        titleIcon.textContent = "🐾🧪";
+        titleText.textContent = "Chỉnh thời gian còn lại: Thuốc Linh Thú Pet (24x)";
+        remMs = Math.max(0, (appState.petPotionEndMs || 0) - now);
+      }
+
+      document.querySelectorAll(".potion-tab-btn").forEach((btn) => {
+        const tab = btn.getAttribute("data-potion-tab");
+        if (tab === kind) {
+          btn.className =
+            "potion-tab-btn px-2 py-1 rounded-lg text-xs font-extrabold bg-amber-500 text-slate-950 shadow";
+        } else {
+          btn.className =
+            "potion-tab-btn px-2 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700";
+        }
+      });
+
+      if (remMs > 0) {
+        const totalSec = Math.ceil(remMs / 1000);
+        document.getElementById("inpPotionHours").value = String(Math.floor(totalSec / 3600));
+        document.getElementById("inpPotionMinutes").value = String(Math.floor((totalSec % 3600) / 60));
+        document.getElementById("inpPotionSeconds").value = String(totalSec % 60);
+      } else {
+        document.getElementById("inpPotionHours").value = "0";
+        document.getElementById("inpPotionMinutes").value = "45";
+        document.getElementById("inpPotionSeconds").value = "0";
+      }
+    }
+
+    function applyPotionDurationMs(kind, durationMs) {
+      const now = Date.now();
+      const targetEnd = durationMs > 0 ? now + durationMs : 0;
+      if (kind === "builder") {
+        appState.builderPotionEndMs = targetEnd;
+      } else if (kind === "lab") {
+        appState.labPotionEndMs = targetEnd;
+      } else {
+        appState.petPotionEndMs = targetEnd;
+      }
+
+      // Reset cờ báo trước cho các task nếu thời gian mới thay đổi
+      const leadMs = appState.leadMinutes * 60 * 1000;
+      appState.tasks.forEach((t) => {
+        if (computeRealRemainingMs(t, now) > leadMs) {
+          t.notifiedLead = false;
+        }
+      });
+
+      saveState();
+      renderTasks();
+    }
+
+    // =========================================================================
+    // 5. WIDGET ĐIỆN THOẠI & PICTURE-IN-PICTURE FLOATING WIDGET
+    // =========================================================================
+    function renderMobileWidget(builderTasks, labTasks, petTasks, now, leadMs) {
+      document.getElementById("widgetClockNow").textContent = formatClockTime(now);
+      const bodyEl = document.getElementById("widgetCompactBody");
+
+      const bRem = Math.max(0, (appState.builderPotionEndMs || 0) - now);
+      const lRem = Math.max(0, (appState.labPotionEndMs || 0) - now);
+      const pRem = Math.max(0, (appState.petPotionEndMs || 0) - now);
+
+      const nextBuilder = builderTasks.find((t) => computeRealRemainingMs(t, now) > 0);
+      const nextLab = labTasks.find((t) => computeRealRemainingMs(t, now) > 0);
+      const nextPet = petTasks.find((t) => computeRealRemainingMs(t, now) > 0);
+
+      const renderMiniSlot = (label, icon, task, boostMs, accentClass) => {
+        if (!task) {
+          return `
+            <div class="rounded-2xl bg-slate-950/75 border border-slate-800 p-2.5 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-[11px] text-slate-400">
+                <span class="font-bold">${icon} ${label}</span>
+                <span class="text-emerald-400 font-bold">Rảnh</span>
+              </div>
+              <p class="font-mono text-sm font-extrabold text-slate-500 mt-1">--:--:--</p>
+              <p class="text-[10px] text-slate-500 truncate">Chưa nâng cấp</p>
+            </div>
+          `;
+        }
+        const rem = computeRealRemainingMs(task, now);
+        const finishTime = formatClockTime(now + rem);
+        const urgent = rem <= leadMs || rem <= 5 * 60 * 1000;
+        return `
+          <div class="rounded-2xl bg-slate-950/90 border ${
+            urgent ? "border-amber-400" : "border-slate-800"
+          } p-2.5 flex flex-col justify-between">
+            <div class="flex items-center justify-between gap-1 text-[10px]">
+              <span class="font-bold text-slate-300 truncate">${icon} ${escapeHtml(task.builder)}</span>
+              ${
+                boostMs > 0
+                  ? `<span class="px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300 font-mono font-bold">🧪${Math.ceil(
+                      boostMs / 60000
+                    )}p</span>`
+                  : `<span class="text-slate-400">${finishTime.slice(0, 5)}</span>`
+              }
+            </div>
+            <p class="font-mono text-sm sm:text-base font-extrabold ${accentClass} mt-0.5">
+              ${formatRemaining(rem)}
+            </p>
+            <p class="text-[10px] text-slate-300 truncate font-medium">${escapeHtml(task.name)}</p>
+          </div>
+        `;
+      };
+
+      // Hàng danh sách rút gọn của tất cả các thợ xây đang chạy
+      const activeBuildersHtml = builderTasks
+        .slice(0, 6)
+        .map((t) => {
+          const rem = computeRealRemainingMs(t, now);
+          const isDone = rem <= 0;
+          const isUrgent = !isDone && rem <= Math.max(leadMs, 5 * 60 * 1000);
+          return `
+            <div class="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-950/60 border ${
+              isDone
+                ? "border-emerald-500/40"
+                : isUrgent
+                ? "border-amber-400/70"
+                : "border-slate-800/80"
+            } text-xs">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="font-bold text-amber-300 shrink-0">${escapeHtml(t.builder)}</span>
+                <span class="text-slate-200 truncate">${escapeHtml(t.name)}</span>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 ml-2">
+                <span class="font-mono font-extrabold ${
+                  isDone ? "text-emerald-400" : isUrgent ? "text-amber-300" : "text-white"
+                }">${isDone ? "XONG (0s)" : formatRemaining(rem)}</span>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+
+      bodyEl.innerHTML = `
+        <div class="grid grid-cols-3 gap-2">
+          ${renderMiniSlot("Thợ Xây", "🔨", nextBuilder, bRem, "text-amber-300")}
+          ${renderMiniSlot("Phòng Lab", "🔬", nextLab, lRem, "text-purple-300")}
+          ${renderMiniSlot("Linh Thú", "🐾", nextPet, pRem, "text-emerald-300")}
+        </div>
+        ${
+          activeBuildersHtml
+            ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">${activeBuildersHtml}</div>`
+            : ""
+        }
+      `;
+
+      // Vẽ lên Canvas cho cửa sổ Widget Nổi (Picture-in-Picture) nếu đang bật
+      drawPipWidgetCanvas(builderTasks, nextLab, nextPet, now, bRem, lRem, pRem);
+    }
+
+    function drawPipWidgetCanvas(builderTasks, nextLab, nextPet, now, bRem, lRem, pRem) {
+      const canvas = document.getElementById("pipWidgetCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.fillStyle = "#0f172a";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Viền & Header
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+
+      ctx.fillStyle = "#f59e0b";
+      ctx.font = "bold 15px sans-serif";
+      ctx.fillText("⚒️ WIDGET THỢ XÂY • LAB • PET", 14, 26);
+
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "12px monospace";
+      ctx.fillText(formatClockTime(now), 385, 26);
+
+      // Trạng thái thuốc
+      let potionText = [];
+      if (bRem > 0) potionText.push(`⚒️10x:${Math.ceil(bRem / 60000)}p`);
+      if (lRem > 0) potionText.push(`🔬24x:${Math.ceil(lRem / 60000)}p`);
+      if (pRem > 0) potionText.push(`🐾24x:${Math.ceil(pRem / 60000)}p`);
+      if (potionText.length > 0) {
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "bold 12px monospace";
+        ctx.fillText(potionText.join("  "), 14, 46);
+      }
+
+      const rows = [];
+      builderTasks.slice(0, 4).forEach((t) => {
+        rows.push({
+          tag: t.builder,
+          name: t.name,
+          rem: computeRealRemainingMs(t, now),
+          color: "#fbbf24"
+        });
+      });
+      if (nextLab) {
+        rows.push({
+          tag: "🔬 Lab",
+          name: nextLab.name,
+          rem: computeRealRemainingMs(nextLab, now),
+          color: "#c084fc"
+        });
+      }
+      if (nextPet) {
+        rows.push({
+          tag: "🐾 Pet",
+          name: nextPet.name,
+          rem: computeRealRemainingMs(nextPet, now),
+          color: "#34d399"
+        });
+      }
+
+      let y = 72;
+      rows.slice(0, 5).forEach((r) => {
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(12, y - 16, canvas.width - 24, 30);
+
+        ctx.fillStyle = r.color;
+        ctx.font = "bold 13px sans-serif";
+        ctx.fillText(`${r.tag}: ${r.name.slice(0, 22)}`, 18, y + 3);
+
+        ctx.fillStyle = r.rem <= 0 ? "#34d399" : "#ffffff";
+        ctx.font = "bold 14px monospace";
+        const timeStr = r.rem <= 0 ? "XONG 0s" : formatRemaining(r.rem);
+        ctx.fillText(timeStr, 340, y + 3);
+        y += 36;
+      });
+    }
+
+    async function launchFloatingPipWidget() {
+      const canvas = document.getElementById("pipWidgetCanvas");
+      const video = document.getElementById("pipWidgetVideo");
+      try {
+        drawPipWidgetCanvas(appState.tasks, null, null, Date.now(), 0, 0, 0);
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+          showToast("Đã đóng cửa sổ Widget nổi.", "info");
+          return;
+        }
+        if (!canvas.captureStream || !document.pictureInPictureEnabled) {
+          // Chuyển sang chế độ Thu Gọn Widget toàn màn hình nếu trình duyệt không hỗ trợ video PiP
+          toggleWidgetOnlyMode(true);
+          showToast("Đã bật giao diện Widget thu gọn cho màn hình điện thoại!", "success");
+          return;
+        }
+        if (!video.srcObject) {
+          video.srcObject = canvas.captureStream(5);
+        }
+        await video.play();
+        await video.requestPictureInPicture();
+        showToast("Đã ghim Widget nổi! Bạn có thể vừa lướt điện thoại vừa nhìn đồng hồ.", "success");
+      } catch (err) {
+        toggleWidgetOnlyMode(true);
+        showToast("Đã chuyển sang chế độ Widget thu gọn dễ nhìn trên điện thoại!", "success");
+      }
+    }
+
+    function toggleWidgetOnlyMode(forceVal) {
+      appState.widgetOnlyMode =
+        typeof forceVal === "boolean" ? forceVal : !appState.widgetOnlyMode;
+      const wrapper = document.getElementById("fullDashboardWrapper");
+      const btn = document.getElementById("btnToggleWidgetMode");
+      if (appState.widgetOnlyMode) {
+        wrapper.classList.add("hidden");
+        btn.textContent = "Mở rộng Cài đặt";
+        btn.className =
+          "px-2.5 py-1 rounded-xl bg-amber-500 text-slate-950 font-extrabold text-[11px] transition shadow";
+      } else {
+        wrapper.classList.remove("hidden");
+        btn.textContent = "Chế độ Widget";
+        btn.className =
+          "px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-[11px] transition";
+      }
+      saveState();
+    }
+
+    // =========================================================================
+    // 6. ĐỊNH DẠNG THỜI GIAN & HIỂN THỊ 3 KHU VỰC RIÊNG BIỆT
+    // =========================================================================
+    function formatRemaining(ms) {
+      if (ms <= 0) return "00:00:00";
+      const totalSec = Math.ceil(ms / 1000);
+      const d = Math.floor(totalSec / 86400);
+      const h = Math.floor((totalSec % 86400) / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+
+      const hh = String(h).padStart(2, "0");
+      const mm = String(m).padStart(2, "0");
+      const ss = String(s).padStart(2, "0");
+      return d > 0 ? `${d}d ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+    }
+
+    function formatShortPotionBadge(ms, defaultLabel) {
+      if (ms <= 0) return defaultLabel;
+      const totalMin = Math.ceil(ms / 60000);
+      return `${totalMin}p`;
+    }
+
+    function formatClockTime(timestampMs) {
+      const date = new Date(timestampMs);
+      const hh = String(date.getHours()).padStart(2, "0");
+      const mm = String(date.getMinutes()).padStart(2, "0");
+      const ss = String(date.getSeconds()).padStart(2, "0");
+      return `${hh}:${mm}:${ss}`;
+    }
+
+    function updateLeadButtonsUI() {
+      const buttons = document.querySelectorAll(".lead-btn");
+      buttons.forEach((btn) => {
+        const val = Number(btn.getAttribute("data-lead"));
+        if (val === appState.leadMinutes) {
+          btn.className =
+            "lead-btn px-2.5 py-1 rounded-lg text-xs font-extrabold bg-amber-500 text-slate-950 shadow transition";
+        } else {
+          btn.className =
+            "lead-btn px-2.5 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition";
+        }
+      });
+    }
+
+    function updatePotionIconsUI(now) {
+      const bRem = Math.max(0, (appState.builderPotionEndMs || 0) - now);
+      const lRem = Math.max(0, (appState.labPotionEndMs || 0) - now);
+      const pRem = Math.max(0, (appState.petPotionEndMs || 0) - now);
+
+      const btnB = document.getElementById("btnLivePotion10x");
+      const btnL = document.getElementById("btnLabPotionIcon");
+      const btnP = document.getElementById("btnPetPotionIcon");
+      const btnStop = document.getElementById("btnStopPotionBoost");
+
+      document.getElementById("badgeBuilderPotion").textContent = formatShortPotionBadge(bRem, "10x");
+      document.getElementById("badgeLabPotion").textContent = formatShortPotionBadge(lRem, "24x");
+      document.getElementById("badgePetPotion").textContent = formatShortPotionBadge(pRem, "24x");
+
+      btnB.classList.toggle("potion-active-glow", bRem > 0);
+      btnL.classList.toggle("potion-active-glow", lRem > 0);
+      btnP.classList.toggle("potion-active-glow", pRem > 0);
+
+      const anyActive = bRem > 0 || lRem > 0 || pRem > 0;
+      btnStop.classList.toggle("hidden", !anyActive);
+
+      const potionBanner = document.getElementById("potionActiveBanner");
+      const clockContainer = document.getElementById("potionRemainingClock");
+      if (anyActive) {
+        potionBanner.classList.remove("hidden");
+        const chips = [];
+        if (bRem > 0) {
+          chips.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-300 font-mono font-bold">⚒️🧪 ${formatRemaining(bRem)}</span>`);
+        }
+        if (lRem > 0) {
+          chips.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-mono font-bold">🔬🧪 ${formatRemaining(lRem)}</span>`);
+        }
+        if (pRem > 0) {
+          chips.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-mono font-bold">🐾🧪 ${formatRemaining(pRem)}</span>`);
+        }
+        clockContainer.innerHTML = chips.join("");
+      } else {
+        potionBanner.classList.add("hidden");
+      }
+    }
+
+    function renderTaskCardHtml(task, now, leadMs) {
+      const realRemainingMs = computeRealRemainingMs(task, now);
+      const gameRemainingMs = Math.max(0, task.gameRemainingMs);
+      const { multiplier, boostRemMs, icon } = getBoostInfoForTask(task, now);
+      const isBoosted = boostRemMs > 0 && gameRemainingMs > 0;
+
+      const totalDurationMs = Math.max(1000, task.initialGameMs || gameRemainingMs + 60000);
+      const progressPct = Math.min(
+        100,
+        Math.max(0, ((totalDurationMs - gameRemainingMs) / totalDurationMs) * 100)
+      );
+
+      const isDone = realRemainingMs <= 0;
+      const isWithinLead = !isDone && leadMs > 0 && realRemainingMs <= leadMs;
+      const isFreeFinish =
+        !isDone && getTaskCategory(task) === "builder" && gameRemainingMs <= 5 * 60 * 1000;
+
+      const exactFinishTimestamp = now + realRemainingMs;
+      const exactAlertTimestamp = Math.max(now, exactFinishTimestamp - leadMs);
+
+      let cardBorder = "border-slate-800 bg-slate-900/90";
+      let statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">Đang nâng cấp</span>`;
+      let barColor = "bg-gradient-to-r from-sky-500 to-amber-500";
+
+      if (isDone) {
+        cardBorder = "border-emerald-500/50 bg-emerald-950/20 alert-card-pulse";
+        statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-500 text-slate-950">✅ ĐÃ XONG (0s)</span>`;
+        barColor = "bg-emerald-400";
+      } else if (isWithinLead) {
+        cardBorder = "border-amber-400 bg-amber-950/25 alert-card-pulse";
+        statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-400 text-slate-950">🔔 CÒN ≤ ${appState.leadMinutes} PHÚT!</span>`;
+        barColor = "bg-gradient-to-r from-amber-400 to-red-500";
+      }
+
+      const freeTag = isFreeFinish
+        ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">⚡ BẤM XONG MIỄN PHÍ!</span>`
+        : "";
+
+      const boostTag = isBoosted
+        ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-sky-500/25 text-sky-200 border border-sky-400/40">${icon} ${multiplier}x</span>`
+        : "";
+
+      return `
+        <div class="rounded-2xl border ${cardBorder} p-3.5 sm:p-4 shadow-lg transition">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2 py-0.5 rounded-md bg-slate-800 text-amber-300 font-bold text-xs border border-slate-700">
+                  ${escapeHtml(task.builder)}
+                </span>
+                <h4 class="font-extrabold text-sm sm:text-base text-white">
+                  ${escapeHtml(task.name)}
+                </h4>
+                ${statusBadge}
+                ${boostTag}
+                ${freeTag}
+              </div>
+              <div class="flex items-center gap-3 text-[11px] text-slate-400 flex-wrap">
+                <span>🔔 Báo trước: <b class="text-amber-300">${
+                  appState.leadMinutes === 0
+                    ? "Khi còn 0s"
+                    : formatClockTime(exactAlertTimestamp)
+                }</b></span>
+                <span>•</span>
+                <span>🏁 Xong thực tế (0s): <b class="text-emerald-300">${formatClockTime(exactFinishTimestamp)}</b></span>
+                ${
+                  isBoosted
+                    ? `<span>• ⏳ Giờ trong game: <b class="text-slate-300">${formatRemaining(gameRemainingMs)}</b></span>`
+                    : ""
+                }
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between sm:justify-end gap-3 mt-2 sm:mt-0">
+              <div class="text-left sm:text-right">
+                <p class="font-mono text-lg sm:text-xl font-extrabold ${
+                  isDone ? "text-emerald-400" : isWithinLead ? "text-amber-300" : "text-white"
+                }">
+                  ${formatRemaining(realRemainingMs)}
+                </p>
+                <p class="text-[10px] text-slate-400">
+                  ${isBoosted ? `Đã trừ thuốc ${multiplier}x` : "Thời gian thực còn lại"}
+                </p>
+              </div>
+
+              <div class="flex items-center gap-1.5 flex-wrap">
+                ${
+                  isWithinLead || isDone
+                    ? `<a href="clashofclans://" class="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold transition shadow">
+                        🚀 Vào Game
+                      </a>`
+                    : ""
+                }
+                ${
+                  !isDone
+                    ? `<button type="button" data-action="sim-alert" data-id="${task.id}" title="Tua nhanh đến sát mốc báo để kiểm tra chuông/rung" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-semibold transition">
+                        Test báo
+                      </button>`
+                    : ""
+                }
+                <button type="button" data-action="delete" data-id="${task.id}" class="px-2.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
+                  Xóa
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden mt-3 border border-slate-800">
+            <div class="h-full ${barColor} transition-all duration-500" style="width: ${progressPct.toFixed(1)}%"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCategorySection(title, icon, badgeColor, tasksInCat, now, leadMs, emptyHint) {
+      const cardsHtml =
+        tasksInCat.length > 0
+          ? tasksInCat.map((t) => renderTaskCardHtml(t, now, leadMs)).join("")
+          : `<div class="rounded-xl border border-dashed border-slate-800/90 bg-slate-950/40 px-4 py-3 text-xs text-slate-400 flex items-center justify-between">
+              <span>${emptyHint}</span>
+              <span class="text-emerald-400 font-semibold">Đang rảnh</span>
+            </div>`;
+
+      return `
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center gap-2">
+              <span class="text-base">${icon}</span>
+              <h3 class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-slate-200">${title}</h3>
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-extrabold ${badgeColor}">
+                ${tasksInCat.length} đang chạy
+              </span>
+            </div>
+          </div>
+          <div class="space-y-2.5">
+            ${cardsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTasks() {
+      const container = document.getElementById("builderListContainer");
+      const now = Date.now();
+      const leadMs = appState.leadMinutes * 60 * 1000;
+
+      updatePotionIconsUI(now);
+
+      if (appState.lastSyncTimeStr) {
+        document.getElementById("lastSyncBadge").textContent = `Đồng bộ lúc ${appState.lastSyncTimeStr}`;
+      }
+
+      appState.tasks.sort(
+        (a, b) => computeRealRemainingMs(a, now) - computeRealRemainingMs(b, now)
+      );
+
+      let activeCount = 0;
+      let almostDoneCount = 0;
+      let nextTask = null;
+      let nextTaskRealMs = 0;
+
+      const builderTasks = [];
+      const labTasks = [];
+      const petTasks = [];
+
+      appState.tasks.forEach((t) => {
+        const realRem = computeRealRemainingMs(t, now);
+        if (realRem > 0) {
+          activeCount++;
+          if (!nextTask) {
+            nextTask = t;
+            nextTaskRealMs = realRem;
+          }
+          if (realRem <= Math.max(leadMs, 5 * 60 * 1000)) almostDoneCount++;
+        }
+
+        const cat = getTaskCategory(t);
+        if (cat === "lab") {
+          labTasks.push(t);
+        } else if (cat === "pet") {
+          petTasks.push(t);
+        } else {
+          builderTasks.push(t);
+        }
+      });
+
+      document.getElementById("statActiveCount").textContent = String(activeCount);
+      document.getElementById("statAlmostDoneCount").textContent = String(almostDoneCount);
+
+      if (nextTask) {
+        document.getElementById("statNextBuilder").textContent = formatRemaining(nextTaskRealMs);
+        document.getElementById("statNextBuilderName").textContent = `${nextTask.builder}: ${nextTask.name}`;
+      } else {
+        document.getElementById("statNextBuilder").textContent = "--:--:--";
+        document.getElementById("statNextBuilderName").textContent = "Tất cả đang rảnh";
+      }
+
+      // Cập nhật Widget điện thoại ở đầu trang
+      renderMobileWidget(builderTasks, labTasks, petTasks, now, leadMs);
+
+      container.innerHTML = [
+        renderCategorySection(
+          "1. Mục Thợ Xây & Anh Hùng",
+          "🔨",
+          "bg-amber-500/20 text-amber-300 border border-amber-500/30",
+          builderTasks,
+          now,
+          leadMs,
+          "Không có Thợ Xây nào đang bận."
+        ),
+        renderCategorySection(
+          "2. Mục Phòng Thí Nghiệm (Lab)",
+          "🔬",
+          "bg-purple-500/20 text-purple-300 border border-purple-500/30",
+          labTasks,
+          now,
+          leadMs,
+          "Phòng Thí Nghiệm (Lab) hiện không nghiên cứu lính/phép nào."
+        ),
+        renderCategorySection(
+          "3. Mục Nhà Linh Thú (Pet House)",
+          "🐾",
+          "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30",
+          petTasks,
+          now,
+          leadMs,
+          "Nhà Linh Thú hiện không nâng cấp thú cưng nào."
+        )
+      ].join("");
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // =========================================================================
+    // 7. VÒNG LẶP ĐẾM NGƯỢC (BÁO TRƯỚC 3-5P & BÁO KHI CÒN 0S)
+    // =========================================================================
+    function tickSecond() {
+      const now = Date.now();
+      const elapsedRealMs = Math.max(0, now - lastTickMs);
+      lastTickMs = now;
+
+      const leadMs = appState.leadMinutes * 60 * 1000;
+      let stateChanged = false;
+
+      appState.tasks.forEach((task) => {
+        if (task.gameRemainingMs > 0) {
+          const { multiplier, boostRemMs } = getBoostInfoForTask(task, now);
+          const activeMult = boostRemMs > 0 ? multiplier : 1;
+          task.gameRemainingMs = Math.max(0, task.gameRemainingMs - elapsedRealMs * activeMult);
+        }
+
+        const realRemainingMs = computeRealRemainingMs(task, now);
+
+        // 1. Báo trước khi xong (nếu mốc báo trước > 0 phút)
+        if (
+          leadMs > 0 &&
+          realRemainingMs > 0 &&
+          realRemainingMs <= leadMs &&
+          !task.notifiedLead
+        ) {
+          task.notifiedLead = true;
+          stateChanged = true;
+          const minsLeft = Math.max(1, Math.round(realRemainingMs / 60000));
+          triggerUrgentAlarm(
+            `⚒️ ${task.builder} sắp xong (${task.name})!`,
+            `Chỉ còn khoảng ${minsLeft} phút thực tế nữa là xong. Bấm 'Mở thẳng vào Game' ngay!`
+          );
+        }
+
+        // 2. Báo ngay khi còn 0s (hoàn thành 100%)
+        if (
+          realRemainingMs <= 0 &&
+          !task.notifiedDone &&
+          (appState.leadMinutes === 0 || appState.alertAtZero)
+        ) {
+          task.notifiedDone = true;
+          stateChanged = true;
+          triggerUrgentAlarm(
+            `✅ CÒN 0s — ${task.builder} ĐÃ XONG 100%!`,
+            `${task.name} đã chạm mốc 00:00:00. Bấm 'Mở thẳng vào Game' để giao việc mới ngay!`
+          );
+        }
+      });
+
+      if (stateChanged) {
+        saveState();
+      }
+      renderTasks();
+    }
+
+    // =========================================================================
+    // 8. ĐỒNG BỘ JSON CLASH OF CLANS
+    // =========================================================================
+    function importCocJsonString(jsonStr, isSilentAuto = false) {
+      let data;
+      try {
+        data = JSON.parse(jsonStr);
+      } catch (e) {
+        if (!isSilentAuto) {
+          showToast("Chuỗi dán vào không đúng định dạng JSON của Clash of Clans!", "warning");
+        }
+        return false;
+      }
+
+      if (!data || typeof data !== "object") return false;
+
+      const now = Date.now();
+      const jsonEpochMs = data.timestamp ? Number(data.timestamp) * 1000 : now;
+      const elapsedSinceExportMs = Math.max(0, Math.min(3600 * 1000, now - jsonEpochMs));
+
+      let detectedBuilderBoostSec = Number(
+        data.builder_boost || data.boost || data.builderPotionBoost || 0
+      );
+      let detectedLabBoostSec = Number(
+        data.lab_boost || data.research_boost || data.researchPotionBoost || 0
+      );
+      let detectedPetBoostSec = Number(
+        data.pet_boost || data.petPotionBoost || 0
+      );
+
+      const categories = [
+        { key: "buildings", prefix: "Thợ xây", category: "builder" },
+        { key: "heroes", prefix: "Thợ xây (Hero)", category: "builder" },
+        { key: "traps", prefix: "Thợ xây (Bẫy)", category: "builder" },
+        { key: "units", prefix: "Phòng Lab", category: "lab" },
+        { key: "spells", prefix: "Phòng Lab", category: "lab" },
+        { key: "pets", prefix: "Nhà Thú (Pet)", category: "pet" }
+      ];
+
+      const oldTaskByKey = {};
+      appState.tasks.forEach((t) => {
+        if (t.itemKey) oldTaskByKey[t.itemKey] = t;
+      });
+
+      const syncedTasks = [];
+      let builderIndex = 1;
+
+      categories.forEach((cat) => {
+        const list = data[cat.key];
+        if (!Array.isArray(list)) return;
+
+        list.forEach((item, idx) => {
+          const timerSec = Number(item.timer);
+          if (item.boost) {
+            const bVal = Number(item.boost);
+            if (cat.category === "builder" && bVal > detectedBuilderBoostSec) {
+              detectedBuilderBoostSec = bVal;
+            } else if (cat.category === "lab" && bVal > detectedLabBoostSec) {
+              detectedLabBoostSec = bVal;
+            } else if (cat.category === "pet" && bVal > detectedPetBoostSec) {
+              detectedPetBoostSec = bVal;
+            }
+          }
+
+          if (timerSec && timerSec > 0) {
+            const rawId = Number(item.data);
+            const nextLvl = (Number(item.lvl) || 1) + 1;
+            const friendlyName = COC_DATA_NAMES[rawId] || `Hạng mục #${rawId}`;
+            const itemKey = `${cat.key}_${rawId}_${idx}`;
+
+            const builderLabel =
+              cat.category === "builder"
+                ? `Thợ xây #${builderIndex++}`
+                : cat.prefix;
+
+            const newGameRemainingMs = Math.max(0, timerSec * 1000 - elapsedSinceExportMs);
+            const prevTask = oldTaskByKey[itemKey];
+
+            syncedTasks.push({
+              id: prevTask ? prevTask.id : "json-" + now + "-" + idx,
+              itemKey,
+              category: cat.category,
+              builder: builderLabel,
+              name: `${friendlyName} (Lên cấp ${nextLvl})`,
+              initialGameMs: prevTask
+                ? Math.max(prevTask.initialGameMs || 0, newGameRemainingMs)
+                : newGameRemainingMs,
+              gameRemainingMs: newGameRemainingMs,
+              notifiedLead: false,
+              notifiedDone: false
+            });
+          }
+        });
+      });
+
+      if (syncedTasks.length === 0) {
+        if (!isSilentAuto) {
+          showToast("Không tìm thấy tiến trình nào đang nâng cấp trong JSON này!", "warning");
+        }
+        return false;
+      }
+
+      if (detectedBuilderBoostSec > 0) {
+        appState.builderPotionEndMs =
+          now + Math.max(0, detectedBuilderBoostSec * 1000 - elapsedSinceExportMs);
+      }
+      if (detectedLabBoostSec > 0) {
+        appState.labPotionEndMs =
+          now + Math.max(0, detectedLabBoostSec * 1000 - elapsedSinceExportMs);
+      }
+      if (detectedPetBoostSec > 0) {
+        appState.petPotionEndMs =
+          now + Math.max(0, detectedPetBoostSec * 1000 - elapsedSinceExportMs);
+      }
+
+      appState.tasks = syncedTasks;
+      appState.lastJsonTimestamp = data.timestamp || Math.floor(now / 1000);
+      appState.lastSyncTimeStr = formatClockTime(now);
+      lastTickMs = now;
+
+      saveState();
+      renderTasks();
+      showToast(
+        `Đã đồng bộ ${syncedTasks.length} tiến trình vào Widget & 3 khu vực!`,
+        "success"
+      );
+      return true;
+    }
+
+    async function tryAutoSyncFromClipboard(isManualButton = false) {
+      if (!isManualButton && !appState.autoClipboard) return;
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+          if (isManualButton) {
+            showToast("Hãy dán chuỗi vừa Copy vào ô JSON bên dưới!", "info");
+            document.getElementById("txtCocJson").focus();
+          }
+          return;
+        }
+        const text = (await navigator.clipboard.readText()).trim();
+        if (!text || !text.startsWith("{") || !text.includes('"buildings"')) {
+          if (isManualButton) {
+            showToast(
+              "Trong Clipboard chưa có JSON của Clash of Clans! Hãy bấm Copy trong Cài đặt game trước.",
+              "warning"
+            );
+          }
+          return;
+        }
+
+        const simpleHash = text.length + ":" + text.slice(0, 60) + ":" + text.slice(-40);
+        if (!isManualButton && simpleHash === appState.lastClipboardHash) {
+          return;
+        }
+
+        appState.lastClipboardHash = simpleHash;
+        document.getElementById("txtCocJson").value = text;
+        importCocJsonString(text, !isManualButton);
+      } catch (err) {
+        if (isManualButton) {
+          showToast("Hãy dán chuỗi vừa Copy vào ô JSON bên dưới để đồng bộ ngay!", "info");
+          document.getElementById("txtCocJson").focus();
+        }
+      }
+    }
+
+    // =========================================================================
+    // 9. GẮN SỰ KIỆN CHO TẤT CẢ NÚT BẤM TRÊN GIAO DIỆN
+    // =========================================================================
+    window.addEventListener("DOMContentLoaded", () => {
+      loadState();
+      updateLeadButtonsUI();
+      updateSoundVibrateUI();
+      document.getElementById("chkContinuousAlarm").checked = appState.continuousAlarm;
+      document.getElementById("chkAutoClipboard").checked = appState.autoClipboard;
+      document.getElementById("chkAlertAtZero").checked = appState.alertAtZero !== false;
+      if (appState.widgetOnlyMode) {
+        toggleWidgetOnlyMode(true);
+      }
+      renderTasks();
+
+      setInterval(tickSecond, 1000);
+
+      window.addEventListener("focus", () => {
+        tryAutoSyncFromClipboard(false);
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          tryAutoSyncFromClipboard(false);
+        }
+      });
+
+      // Nút Ghim Widget Nổi (Picture-in-Picture) & Chế độ Widget thu gọn
+      document.getElementById("btnFloatingPipWidget").addEventListener("click", () => {
+        ensureAudioContext();
+        launchFloatingPipWidget();
+      });
+
+      document.getElementById("btnToggleWidgetMode").addEventListener("click", () => {
+        toggleWidgetOnlyMode();
+      });
+
+      // Nút Bật / Tắt Âm Báo
+      document.getElementById("btnToggleSound").addEventListener("click", () => {
+        ensureAudioContext();
+        if (appState.vibrateOnly) {
+          appState.vibrateOnly = false;
+          appState.soundEnabled = true;
+        } else {
+          appState.soundEnabled = !appState.soundEnabled;
+        }
+        saveState();
+        updateSoundVibrateUI();
+        if (appState.soundEnabled) {
+          playChimeOrVibrate();
+          showToast("Đã BẬT âm báo chuông!", "success");
+        } else {
+          stopUrgentAlarm();
+          showToast("Đã TẮT âm báo chuông.", "info");
+        }
+      });
+
+      // Nút Chỉ Bật Rung
+      document.getElementById("btnToggleVibrateOnly").addEventListener("click", () => {
+        appState.vibrateOnly = !appState.vibrateOnly;
+        if (appState.vibrateOnly) {
+          triggerVibrationPulse();
+          showToast("Đã bật chế độ CHỈ BẬT RUNG (Tắt tiếng chuông)!", "success");
+        } else {
+          appState.soundEnabled = true;
+          showToast("Đã tắt chế độ Chỉ rung (Khôi phục âm báo).", "info");
+        }
+        saveState();
+        updateSoundVibrateUI();
+      });
+
+      document.getElementById("btnOneTapSync").addEventListener("click", () => {
+        ensureAudioContext();
+        tryAutoSyncFromClipboard(true);
+      });
+
+      document.getElementById("chkAutoClipboard").addEventListener("change", (e) => {
+        appState.autoClipboard = e.target.checked;
+        saveState();
+      });
+
+      document.getElementById("chkAlertAtZero").addEventListener("change", (e) => {
+        appState.alertAtZero = e.target.checked;
+        saveState();
+        showToast(
+          appState.alertAtZero
+            ? "Đã bật báo thêm ngay khi đồng hồ chạm 0s!"
+            : "Chỉ báo ở mốc báo trước.",
+          "info"
+        );
+      });
+
+      // --- 3 NÚT ICON BÌNH THUỐC & KHUNG CHỈNH GIỜ THUỐC ĐANG CHẠY DỞ ---
+      document.getElementById("btnLivePotion10x").addEventListener("click", () => {
+        ensureAudioContext();
+        openPotionEditor("builder");
+      });
+
+      document.getElementById("btnLabPotionIcon").addEventListener("click", () => {
+        ensureAudioContext();
+        openPotionEditor("lab");
+      });
+
+      document.getElementById("btnPetPotionIcon").addEventListener("click", () => {
+        ensureAudioContext();
+        openPotionEditor("pet");
+      });
+
+      document.getElementById("btnOpenPotionCustomEditor").addEventListener("click", () => {
+        ensureAudioContext();
+        const panel = document.getElementById("potionEditorPanel");
+        if (panel.classList.contains("hidden")) {
+          openPotionEditor(selectedPotionForEdit);
+        } else {
+          panel.classList.add("hidden");
+        }
+      });
+
+      document.getElementById("btnClosePotionEditor").addEventListener("click", () => {
+        document.getElementById("potionEditorPanel").classList.add("hidden");
+      });
+
+      document.querySelectorAll(".potion-tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          openPotionEditor(btn.getAttribute("data-potion-tab"));
+        });
+      });
+
+      document.querySelectorAll(".potion-preset-chip").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          const mins = Number(chip.getAttribute("data-pmin")) || 45;
+          document.getElementById("inpPotionHours").value = String(Math.floor(mins / 60));
+          document.getElementById("inpPotionMinutes").value = String(mins % 60);
+          document.getElementById("inpPotionSeconds").value = "0";
+          applyPotionDurationMs(selectedPotionForEdit, mins * 60 * 1000);
+          showToast(`Đã chỉnh thời gian bình thuốc còn đúng ${mins} phút!`, "success");
+        });
+      });
+
+      document.getElementById("btnApplyCustomPotionTime").addEventListener("click", () => {
+        const h = Math.max(0, Number(document.getElementById("inpPotionHours").value) || 0);
+        const m = Math.max(0, Number(document.getElementById("inpPotionMinutes").value) || 0);
+        const s = Math.max(0, Number(document.getElementById("inpPotionSeconds").value) || 0);
+        const totalMs = (h * 3600 + m * 60 + s) * 1000;
+        applyPotionDurationMs(selectedPotionForEdit, totalMs);
+        showToast(
+          totalMs > 0
+            ? `Đã đặt thời gian thuốc còn lại: ${h}h ${m}p ${s}s!`
+            : "Đã đặt thời gian thuốc về 0.",
+          "success"
+        );
+      });
+
+      document.getElementById("btnAddOneHourPotion").addEventListener("click", () => {
+        const now = Date.now();
+        let curEnd = now;
+        if (selectedPotionForEdit === "builder") curEnd = Math.max(now, appState.builderPotionEndMs || 0);
+        else if (selectedPotionForEdit === "lab") curEnd = Math.max(now, appState.labPotionEndMs || 0);
+        else curEnd = Math.max(now, appState.petPotionEndMs || 0);
+
+        const nextDurationMs = curEnd - now + 60 * 60 * 1000;
+        applyPotionDurationMs(selectedPotionForEdit, nextDurationMs);
+        openPotionEditor(selectedPotionForEdit);
+        showToast("Đã cộng thêm 60 phút (1 bình) vào bộ đếm thuốc!", "success");
+      });
+
+      document.getElementById("btnClearSinglePotion").addEventListener("click", () => {
+        applyPotionDurationMs(selectedPotionForEdit, 0);
+        openPotionEditor(selectedPotionForEdit);
+        showToast("Đã tắt bình thuốc này.", "info");
+      });
+
+      document.getElementById("btnStopPotionBoost").addEventListener("click", () => {
+        appState.builderPotionEndMs = 0;
+        appState.labPotionEndMs = 0;
+        appState.petPotionEndMs = 0;
+        saveState();
+        renderTasks();
+        showToast("Đã tắt hiệu ứng đếm của cả 3 bình tăng tốc.", "info");
+      });
+
+      // --- 3 NÚT ICON TRỪ NHANH 1 BÌNH THUỐC ---
+      document.getElementById("btnBoostPotion").addEventListener("click", () => {
+        ensureAudioContext();
+        let count = 0;
+        appState.tasks.forEach((t) => {
+          if (t.gameRemainingMs > 0 && getTaskCategory(t) === "builder") {
+            t.gameRemainingMs = Math.max(2000, t.gameRemainingMs - 54 * 60 * 1000);
+            count++;
+          }
+        });
+        if (count === 0) {
+          showToast("Không có Thợ Xây nào đang bận!", "warning");
+          return;
+        }
+        saveState();
+        tickSecond();
+        showToast(`⚒️⚡ Đã trừ 54 phút cho ${count} Thợ Xây!`, "success");
+      });
+
+      document.getElementById("btnInstantLabPotion").addEventListener("click", () => {
+        ensureAudioContext();
+        let count = 0;
+        appState.tasks.forEach((t) => {
+          if (t.gameRemainingMs > 0 && getTaskCategory(t) === "lab") {
+            t.gameRemainingMs = Math.max(2000, t.gameRemainingMs - 23 * 3600 * 1000);
+            count++;
+          }
+        });
+        if (count === 0) {
+          showToast("Không có tiến trình Phòng Lab nào đang chạy!", "warning");
+          return;
+        }
+        saveState();
+        tickSecond();
+        showToast("🔬⚡ Đã trừ 23 giờ (1 bình Nghiên Cứu) cho Phòng Lab!", "success");
+      });
+
+      document.getElementById("btnInstantPetPotion").addEventListener("click", () => {
+        ensureAudioContext();
+        let count = 0;
+        appState.tasks.forEach((t) => {
+          if (t.gameRemainingMs > 0 && getTaskCategory(t) === "pet") {
+            t.gameRemainingMs = Math.max(2000, t.gameRemainingMs - 23 * 3600 * 1000);
+            count++;
+          }
+        });
+        if (count === 0) {
+          showToast("Không có tiến trình Linh Thú nào đang chạy!", "warning");
+          return;
+        }
+        saveState();
+        tickSecond();
+        showToast("🐾⚡ Đã trừ 23 giờ (1 bình Linh Thú) cho Nhà Linh Thú!", "success");
+      });
+
+      // Chuyển đổi mốc phút báo trước (0s, 3p, 4p, 5p, 10p)
+      document.getElementById("leadTimeGroup").addEventListener("click", (e) => {
+        const btn = e.target.closest(".lead-btn");
+        if (!btn) return;
+        ensureAudioContext();
+        appState.leadMinutes = Number(btn.getAttribute("data-lead"));
+        const now = Date.now();
+        const leadMs = appState.leadMinutes * 60 * 1000;
+        appState.tasks.forEach((t) => {
+          if (computeRealRemainingMs(t, now) > leadMs) {
+            t.notifiedLead = false;
+          }
+        });
+        saveState();
+        updateLeadButtonsUI();
+        renderTasks();
+        showToast(
+          appState.leadMinutes === 0
+            ? "Đã chỉnh chỉ báo ngay khi còn 0s (hoàn thành 100%)!"
+            : `Đã chỉnh báo trước khi xong ${appState.leadMinutes} phút (và báo khi còn 0s)!`,
+          "success"
+        );
+      });
+
+      document.getElementById("chkContinuousAlarm").addEventListener("change", (e) => {
+        appState.continuousAlarm = e.target.checked;
+        if (!appState.continuousAlarm) {
+          stopUrgentAlarm();
+        }
+        saveState();
+      });
+
+      document.getElementById("btnTestSound").addEventListener("click", () => {
+        triggerUrgentAlarm(
+          appState.vibrateOnly ? "📳 Kiểm tra chế độ Chỉ Bật Rung!" : "🔔 Kiểm tra chuông báo!",
+          `Chế độ hiện tại: ${
+            appState.vibrateOnly
+              ? "Chỉ rung (Tắt tiếng)"
+              : appState.soundEnabled
+              ? "Bật cả âm báo & rung"
+              : "Tắt âm báo"
+          }.`
+        );
+      });
+
+      document.getElementById("btnStopAlarmSound").addEventListener("click", () => {
+        stopUrgentAlarm();
+        showToast("Đã tắt cảnh báo hiện tại.", "info");
+      });
+
+      document.getElementById("btnEnableNotif").addEventListener("click", async () => {
+        ensureAudioContext();
+        try {
+          if (!("Notification" in window)) {
+            showToast("Đã kích hoạt chế độ Chuông báo + Rung trực tiếp!", "success");
+            document.getElementById("notifStatusText").textContent = "Đã bật chuông";
+            return;
+          }
+          const perm = await Notification.requestPermission();
+          if (perm === "granted") {
+            document.getElementById("notifStatusText").textContent = "Đã bật thông báo";
+            showToast("Đã cấp quyền thông báo hệ thống thành công!", "success");
+          } else {
+            document.getElementById("notifStatusText").textContent = "Dùng chuông Web";
+            showToast("Đã bật chế độ báo trực tiếp trên ứng dụng!", "info");
+          }
+        } catch (err) {
+          document.getElementById("notifStatusText").textContent = "Đã bật chuông";
+          showToast("Đã mở khóa bộ phát cảnh báo!", "success");
+        }
+      });
+
+      document.getElementById("btnWakeLock").addEventListener("click", async () => {
+        const btn = document.getElementById("btnWakeLock");
+        try {
+          if (!wakeLockSentinel && "wakeLock" in navigator) {
+            wakeLockSentinel = await navigator.wakeLock.request("screen");
+            btn.textContent = "☀️ Giữ sáng màn hình: Bật";
+            btn.classList.add("text-amber-300", "border-amber-500/40");
+            showToast("Đã bật giữ sáng màn hình!", "success");
+            wakeLockSentinel.addEventListener("release", () => {
+              wakeLockSentinel = null;
+              btn.textContent = "🌙 Giữ sáng màn hình: Tắt";
+              btn.classList.remove("text-amber-300", "border-amber-500/40");
+            });
+          } else if (wakeLockSentinel) {
+            await wakeLockSentinel.release();
+            wakeLockSentinel = null;
+            btn.textContent = "🌙 Giữ sáng màn hình: Tắt";
+            btn.classList.remove("text-amber-300", "border-amber-500/40");
+            showToast("Đã tắt chế độ giữ sáng màn hình.", "info");
+          } else {
+            showToast("Trình duyệt hiện tại tự quản lý chế độ sáng màn hình.", "info");
+          }
+        } catch (e) {
+          showToast("Hãy mở trang bằng Chrome trên điện thoại để dùng tính năng Giữ sáng.", "info");
+        }
+      });
+
+      const tabBtnManual = document.getElementById("tabBtnManual");
+      const tabBtnJson = document.getElementById("tabBtnJson");
+      const panelManual = document.getElementById("panelManual");
+      const panelJson = document.getElementById("panelJson");
+
+      tabBtnManual.addEventListener("click", () => {
+        panelManual.classList.remove("hidden");
+        panelJson.classList.add("hidden");
+        tabBtnManual.className =
+          "py-3 px-4 text-xs sm:text-sm font-bold text-amber-400 border-b-2 border-amber-400 bg-slate-900/60 transition";
+        tabBtnJson.className =
+          "py-3 px-4 text-xs sm:text-sm font-bold text-slate-400 hover:text-slate-200 transition";
+      });
+
+      tabBtnJson.addEventListener("click", () => {
+        panelJson.classList.remove("hidden");
+        panelManual.classList.add("hidden");
+        tabBtnJson.className =
+          "py-3 px-4 text-xs sm:text-sm font-bold text-amber-400 border-b-2 border-amber-400 bg-slate-900/60 transition";
+        tabBtnManual.className =
+          "py-3 px-4 text-xs sm:text-sm font-bold text-slate-400 hover:text-slate-200 transition";
+      });
+
+      document.querySelectorAll(".quick-name-chip").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          const name = chip.getAttribute("data-quickname");
+          const slot = chip.getAttribute("data-slot");
+          document.getElementById("inpUpgradeName").value = name;
+          if (slot) {
+            document.getElementById("selBuilderSlot").value = slot;
+          }
+        });
+      });
+
+      document.getElementById("btnAddManual").addEventListener("click", () => {
+        ensureAudioContext();
+        const builder = document.getElementById("selBuilderSlot").value;
+        const name = document.getElementById("inpUpgradeName").value.trim() || "Hạng mục nâng cấp";
+        const d = Math.max(0, Number(document.getElementById("inpDays").value) || 0);
+        const h = Math.max(0, Number(document.getElementById("inpHours").value) || 0);
+        const m = Math.max(0, Number(document.getElementById("inpMinutes").value) || 0);
+        const s = Math.max(0, Number(document.getElementById("inpSeconds").value) || 0);
+
+        const totalSec = d * 86400 + h * 3600 + m * 60 + s;
+        if (totalSec <= 0) {
+          showToast("Vui lòng nhập thời gian lớn hơn 0 giây!", "warning");
+          return;
+        }
+
+        const now = Date.now();
+        const category = getTaskCategory({ builder });
+        appState.tasks.push({
+          id: "manual-" + now + "-" + Math.random().toString(36).slice(2, 6),
+          category,
+          builder,
+          name,
+          initialGameMs: totalSec * 1000,
+          gameRemainingMs: totalSec * 1000,
+          notifiedLead: false,
+          notifiedDone: false
+        });
+
+        saveState();
+        renderTasks();
+        showToast(`Đã thêm vào mục ${builder} (${name})!`, "success");
+      });
+
+      document.getElementById("btnAddQuickDemo").addEventListener("click", () => {
+        ensureAudioContext();
+        const now = Date.now();
+        const totalWaitMs = (appState.leadMinutes * 60 + 8) * 1000;
+        const slot = document.getElementById("selBuilderSlot").value;
+        appState.tasks.unshift({
+          id: "quicktest-" + now,
+          category: getTaskCategory({ builder: slot }),
+          builder: slot,
+          name: "Mẫu thử nghiệm (Báo sau 8s)",
+          initialGameMs: totalWaitMs + 120000,
+          gameRemainingMs: totalWaitMs,
+          notifiedLead: false,
+          notifiedDone: false
+        });
+        saveState();
+        renderTasks();
+        showToast("Đã tạo mẫu thử! Sẽ báo sau 8 giây nữa.", "success");
+      });
+
+      document.getElementById("btnLoadSampleJson").addEventListener("click", () => {
+        const sample = {
+          tag: "#2PP9988LQ",
+          timestamp: Math.floor(Date.now() / 1000),
+          builder_boost: 2280,
+          lab_boost: 2700,
+          pet_boost: 1920,
+          buildings: [
+            { data: 1000027, lvl: 7, timer: (appState.leadMinutes * 60) * 10 + 90 },
+            { data: 1000021, lvl: 8, timer: 21600 }
+          ],
+          heroes: [
+            { data: 28000001, lvl: 74, timer: 19800 }
+          ],
+          units: [
+            { data: 4000059, lvl: 4, timer: 90000 }
+          ],
+          pets: [
+            { data: 73000003, lvl: 7, timer: 72000 }
+          ]
+        };
+        document.getElementById("txtCocJson").value = JSON.stringify(sample, null, 2);
+        showToast(
+          "Đã nạp JSON mẫu có sẵn thuốc đang chạy dở (38p, 45p, 32p)! Bấm 'Quét & Đặt Lịch Toàn Bộ Thợ Xây'.",
+          "info"
+        );
+      });
+
+      document.getElementById("btnParseJson").addEventListener("click", () => {
+        ensureAudioContext();
+        const raw = document.getElementById("txtCocJson").value.trim();
+        if (!raw) {
+          showToast("Hãy dán chuỗi JSON từ game hoặc bấm nút 'Nạp thử JSON mẫu'!", "warning");
+          return;
+        }
+        importCocJsonString(raw, false);
+      });
+
+      document.getElementById("btnClearFinished").addEventListener("click", () => {
+        const now = Date.now();
+        const before = appState.tasks.length;
+        appState.tasks = appState.tasks.filter((t) => computeRealRemainingMs(t, now) > 0);
+        const removed = before - appState.tasks.length;
+        saveState();
+        renderTasks();
+        showToast(
+          removed > 0 ? `Đã dọn ${removed} mục hoàn thành.` : "Chưa có mục nào hoàn thành 100%.",
+          "info"
+        );
+      });
+
+      document.getElementById("builderListContainer").addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-action]");
+        if (!btn) return;
+        ensureAudioContext();
+        const action = btn.getAttribute("data-action");
+        const id = btn.getAttribute("data-id");
+
+        if (action === "delete") {
+          appState.tasks = appState.tasks.filter((t) => t.id !== id);
+          saveState();
+          renderTasks();
+          showToast("Đã xóa lịch hẹn giờ.", "info");
+        } else if (action === "sim-alert") {
+          const target = appState.tasks.find((t) => t.id === id);
+          if (target) {
+            const now = Date.now();
+            const { multiplier, boostRemMs } = getBoostInfoForTask(target, now);
+            const factor = boostRemMs > 0 ? multiplier : 1;
+            target.gameRemainingMs = (appState.leadMinutes * 60 + 3) * 1000 * factor;
+            target.notifiedLead = false;
+            target.notifiedDone = false;
+            saveState();
+            renderTasks();
+            showToast(
+              `Đã tua "${target.name}" đến sát mốc báo! Sẽ cảnh báo sau 3 giây...`,
+              "warning"
+            );
+          }
+        }
+      });
+    });
+  </script>
+</body>
+</html>
